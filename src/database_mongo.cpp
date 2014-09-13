@@ -15,6 +15,7 @@ bool database_mongo::connect(const char* ip_str)
 	return true;
 }
 
+
 bool database_mongo::ensureIndex(const string& connection, const mongo::BSONObj& key)
 {
 	//return _db_conn.ensureIndex(connection, key, true);

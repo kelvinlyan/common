@@ -1,14 +1,29 @@
-#include "../include/database.h"
+#include <mongo/bson/bson.h>
+#include <mongo/client/dbclient.h>
+#include "json/json.h"
+#include <string>
 #include <iostream>
+
 using namespace std;
 
 int main()
 {
-	if(database_mongo::shared()->connect("127.0.0.1"))
-		cout << "success" << endl;
+	Json::Value var;
+	var["a"] = 1;
+	Json::Value var2;
+	var2["b1"] = "b1";
+	var2["b2"] = 2;
 
-	mongo::BSONObj obj = BSON("a" << 1);
-	database_mongo::shared()->save("testA.table1", obj, obj);
-	BSONObjVec objs;
-	database_mongo::shared()->load("testA.table1", objs);
+	var["b"] = var2;
+	cout << var.toStyledString() << endl;
+
+	mongo::BSONObj obj = mongo::fromjson(var.toStyledString());
+
+	cout << obj.jsonString() << endl;
+
+	Json::Value result;
+	Json::Reader reader;
+	reader.parse(obj.jsonString(), result);
+	cout << result.toStyledString() << endl;
+
 }

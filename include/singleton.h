@@ -27,7 +27,7 @@ public:
         return _pInstance;
     }
     
-    void destory_instance()
+    void destroy()
     {
         if(_pInstance)
         {

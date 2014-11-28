@@ -25,17 +25,17 @@ namespace iLog
 
 				pthread_mutex_destroy(&_mutex);	
 			}
-			
+
 			inline bool is_open()
 			{
 				return _write.is_open();
 			}
 
 			template<typename T>
-			inline log_stream& operator<<(const T& data)
-			{
-				_write << data;
-			}
+				inline log_stream& operator<<(const T& data)
+				{
+					_write << data;
+				}
 
 			inline void flush()
 			{
@@ -122,7 +122,7 @@ namespace iLog
 
 			inline void checkAndUpdate(time_t now)
 			{
-				if(now < _current_begin_time || now >= _current_end_time)
+				if(now >= _current_begin_time || now < _current_end_time)
 					return;
 
 				update(now);
@@ -167,11 +167,9 @@ namespace iLog
 			{
 				struct tm t;
 				localtime_r(&now, &t);
-				/*_stream << setfill('0') << setw(2) << t.tm_hour << ":"
-					<< setfill('0') << setw(2) << t.tm_min << ":"
-					<< setfill('0') << setw(2) << t.tm_sec << " ["
-					<< severity_strs[severity] << "] ";
-				*/
+				char buff[128];
+				sprintf(buff, "%02d:%02d:%02d [%s] ", t.tm_hour, t.tm_min, t.tm_sec, severity_strs[severity]);
+				_stream << buff;
 			}
 
 			inline void lastLog()
@@ -195,28 +193,29 @@ namespace iLog
 			log_stream _stream;
 	};
 
-	class log_helper
+	class log_helper_mt
 	{
 		public:
-			log_helper(log_impl* ptr, int severity):_pImpl(ptr)
-		{
-			_pImpl->stream().lock();
-			time_t now = time(NULL);
-			_pImpl->checkAndUpdate(now);
-			_pImpl->preLog(severity, now);
-		}
-			~log_helper()
+			log_helper_mt(log_impl* ptr, int severity)
+				: _pImpl(ptr)
+			{
+				_pImpl->stream().lock();
+				time_t now = time(NULL);
+				_pImpl->checkAndUpdate(now);
+				_pImpl->preLog(severity, now);
+			}
+			~log_helper_mt()
 			{
 				_pImpl->lastLog();
 				_pImpl->stream().unlock();
 			}
 
-			template<typename T>
-				inline log_helper& operator<<(const T& data)
-				{
-					_pImpl->stream() << data;
-					return *this;
-				}
+			template<typename T> 
+			inline log_helper_mt& operator<<(const T& data)
+			{
+				_pImpl->stream() << data;
+				return *this;
+			}
 
 
 		private:
@@ -224,6 +223,45 @@ namespace iLog
 	};
 
 	class logger_mt
+	{
+		public:
+			inline log_helper_mt info()
+			{
+				return log_helper_mt(&_impl, INFO);
+			}
+
+		private:
+			log_impl _impl;
+	};
+	
+	class log_helper
+	{
+		public:
+			log_helper(log_impl* ptr, int severity)
+				: _pImpl(ptr)
+			{
+				time_t now = time(NULL);
+				_pImpl->checkAndUpdate(now);
+				_pImpl->preLog(severity, now);
+			}
+			~log_helper()
+			{
+				_pImpl->lastLog();
+			}
+
+			template<typename T> 
+			inline log_helper& operator<<(const T& data)
+			{
+				_pImpl->stream() << data;
+				return *this;
+			}
+			
+
+		private:
+			log_impl* _pImpl;
+	};
+
+	class logger
 	{
 		public:
 			inline log_helper info()

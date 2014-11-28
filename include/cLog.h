@@ -6,7 +6,6 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <iomanip>
-#include <sstream>
 
 using namespace std;
 
@@ -177,7 +176,7 @@ namespace iLog
 			{
 				_formatter << "\n";
 				string str = _formatter.str();
-				_formatter.str("");
+				_formatter.clear();
 				printf("%s", str.c_str());
 				_stream << str;
 				_stream.flush();
@@ -186,11 +185,6 @@ namespace iLog
 			inline log_stream& stream()
 			{
 				return _stream;
-			}
-
-			inline ostringstream& formatter()
-			{
-				return _formatter;
 			}
 
 		private:
@@ -224,7 +218,7 @@ namespace iLog
 			template<typename T> 
 			inline log_helper_mt& operator<<(const T& data)
 			{
-				_pImpl->formatter() << data;
+				_pImpl->stream() << data;
 				return *this;
 			}
 
@@ -263,7 +257,7 @@ namespace iLog
 			template<typename T> 
 			inline log_helper& operator<<(const T& data)
 			{
-				_pImpl->formatter() << data;
+				_pImpl->stream() << data;
 				return *this;
 			}
 			

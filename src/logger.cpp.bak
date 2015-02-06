@@ -1,0 +1,97 @@
+#include "logger.h"
+#include "iTime.h"
+#include <sys/stat.h>
+
+log_base::log_base()
+{
+	time_t now = time(NULL);
+	_current_begin_time = now - now % iTime::DAY;
+	_current_end_time = _current_begin_time + iTime::DAY;
+
+	if(isFileExist(_file_name.c_str()))
+	{
+		time_t create_time = getFileCreateTime(_file_name.c_str());
+		if(create_time < _current_begin_time || create_time >= _current_end_time)
+		{
+			string new_file_name = getFileName(create_time);
+			if(rename(_file_name.c_str(), new_file_name.c_str()) != 0)
+				perror("rename");
+		}
+	}
+
+	_ofs.open(_file_name.c_str(), ios::out | ios::app);
+}
+
+void log_base::init(const char* path)
+{
+	pthread_mutex_init(&_write_mutex, NULL);
+	_file_path = path;
+	_file_name = path + "/sample.log";
+}
+
+log_base::~log_base()
+{
+	_ofs.close();
+}
+
+log_base& log_base::operator<<(const string& str)
+{
+	printf("<< begin\n");
+	checkAndUpdate();
+	_ofs << str;
+	printf("<< end\n");
+	return *this;
+}
+
+
+void log_base::checkAndUpdate()
+{
+	time_t now = time(NULL);
+	if(now >= _current_begin_time && now < _current_end_time)
+		return;
+
+	update(now);
+}
+
+string log_base::getFileName(time_t time_stamp)
+{
+}
+
+void log_base::update(time_t now)
+{
+	_ofs.close();
+	string new_file_name = getFileName(_current_begin_time);
+
+	if(rename(_file_name.c_str(), new_file_name.c_str()) != 0)
+		perror("rename");
+
+	_current_begin_time = now - now % 86400;
+	_current_end_time = _current_begin_time + 86400;
+	_ofs.open(_file_name.c_str());
+}
+
+bool log_base::isFileExist(const char* filename)
+{
+	ifstream fin(filename);
+	return (bool)fin;
+}
+
+void log_base::test()
+{
+	//printf("%s\n", getFileName().c_str());
+	time_t now = time(NULL);
+	update(now);
+	string str = "abc";
+	_ofs << str;
+}
+
+time_t log_base::getFileCreateTime(const char* pstr)
+{
+	struct stat st;
+	stat(pstr, &st);
+	return st.st_ctime;	
+}
+
+
+
+

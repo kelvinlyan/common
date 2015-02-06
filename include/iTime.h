@@ -9,6 +9,11 @@ using namespace std;
 
 namespace iTime
 {
+	const static unsigned int SEC  = 1;
+	const static unsigned int MIN  = SEC * 60;
+	const static unsigned int HOUR = MIN * 60;
+	const static unsigned int DAY  = HOUR * 24;
+
 	static inline string str()
 	{
 		char buff[32];

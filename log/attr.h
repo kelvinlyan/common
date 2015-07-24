@@ -27,13 +27,14 @@ namespace nLog
 #ifndef NLOGMSGBUF
 #define NLOGMSGBUF 10240
 #endif
-
+	
 	class iAttr
 	{
 		public:
 			virtual const char* get() = 0;
 	};
 
+	typedef vector<iAttr*> attrList;
 	typedef const char*(*getAttr)(void);
 
 	class constantAttr : public iAttr
@@ -105,6 +106,11 @@ namespace nLog
 			{
 				analyse(format);
 			}
+			~timeAttr()
+			{
+				FOREACH(vector<iAttr*>, iter, _attrs)
+					delete *iter;
+			}
 			virtual const char* get()
 			{
 				_now = time(NULL);
@@ -123,122 +129,8 @@ namespace nLog
 			}
 			
 		private:
-			void analyse(const string& format)
-			{
-				int begin = 0;
-				int end = 0;
-				do
-				{
-					end = format.find('%', begin);
-					if(end == string::npos)
-					{
-						break;
-					}
-					else
-					{
-						for(int i = end + 1; i < format.size(); ++i)
-						{
-							char c = format[i];
-							string temp;
-							bool flag = false;
-							switch(c)
-							{
-								case 'Y':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_year, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 'm':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_month, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 'd':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_tm.tm_mday, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 'H':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_tm.tm_hour, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 'M':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_tm.tm_min, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 'S':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'd';
-										_attrs.push_back((iAttr*)(new bindIntAttr(&_tm.tm_sec, temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								case 's':
-								{
-									temp = format.substr(begin, i - begin + 1);
-									if(!temp.empty())
-									{
-										temp[temp.size() - 1] = 'u';
-										_attrs.push_back((iAttr*)(new bindUIntAttr((unsigned*)(&_now), temp.c_str())));
-									}
-									flag = true;
-									break;
-								}
-								default:
-									break;
-							}
-							if(flag)
-							{
-								begin = i + 1;
-								break;
-							}
-						}
-					}
-				}
-				while(true);
-				if(begin != format.size())
-				{
-					string temp = format.substr(begin);
-					if(!temp.empty())
-						_attrs.push_back((iAttr*)(new constantAttr(temp.c_str())));
-				}
-			}
+			bool analyseField(const string& format, int begin, int end, int& bind_value);
+			void analyse(const string& format);
 
 		private:
 			time_t _now;

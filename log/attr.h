@@ -55,29 +55,28 @@ namespace nLog
 	class lineIdAttr : public iAttr
 	{
 		public:
-			lineIdAttr(const char* format = NULL, int color = nColor::DEFAULT)
-				: _line_id(0)
+			lineIdAttr(lineIdTicker* line_id_ticker, const char* format = NULL, int color = nColor::DEFAULT)
 			{
+				_line_id = line_id_ticker->getLineId();
 				_format = format? format : "%u";
 				_format = nColor::makeFormat(_format.c_str(), color);
 			}
 			virtual const char* get()
 			{
-				++_line_id;
-				snprintf(_buff, NLOGATTRBUF - 1, _format.c_str(), _line_id);
+				snprintf(_buff, NLOGATTRBUF - 1, _format.c_str(), *_line_id);
 				return _buff;
 			}
 		private:
 			string _format;
 			char _buff[NLOGATTRBUF];
-			unsigned _line_id;
+			const unsigned* _line_id;
 	};	
 
 #define CREATE_BINDATTR(BINDTYPE, ATTRNAME, TYPEFORMAT) \
 	class ATTRNAME : public iAttr \
 	{ \
 		public: \
-			ATTRNAME(BINDTYPE* ptr, const char* format = NULL, int color = nColor::DEFAULT) \
+			ATTRNAME(const BINDTYPE* ptr, const char* format = NULL, int color = nColor::DEFAULT) \
 				: _value(ptr) \
 			{ \
 				_format = format? format : TYPEFORMAT; \
@@ -89,7 +88,7 @@ namespace nLog
 				return _buff; \
 			} \
 		private: \
-			BINDTYPE* _value; \
+			const BINDTYPE* _value; \
 			string _format; \
 			char _buff[NLOGATTRBUF]; \
 	}; \
@@ -101,9 +100,17 @@ namespace nLog
 	class timeAttr : public iAttr
 	{
 		public:
-			timeAttr(const string& format, int color = nColor::DEFAULT)
+			timeAttr(timeTicker* time_ticker, const string& format, int color = nColor::DEFAULT)
 				: _color(color)
 			{
+				_year = time_ticker->getYear();
+				_month = time_ticker->getMonth();
+				_day = time_ticker->getDay();
+				_hour = time_ticker->getHour();
+				_min = time_ticker->getMin();
+				_sec = time_ticker->getSec();
+				_timestamp = time_ticker->getTimeStamp();
+
 				analyse(format);
 			}
 			~timeAttr()
@@ -113,12 +120,8 @@ namespace nLog
 			}
 			virtual const char* get()
 			{
-				_now = time(NULL);
-				localtime_r(&_now, &_tm);
-				_year = _tm.tm_year + 1900;
-				_month = _tm.tm_mon + 1;
 				int count = 0;
-				FOREACH(vector<iAttr*>, iter, _attrs)
+				FOREACH(attrList, iter, _attrs)
 					count += snprintf(_buff + count, NLOGATTRBUF - 1 - count, "%s", (*iter)->get());
 				if(_color != nColor::DEFAULT)
 				{
@@ -129,16 +132,20 @@ namespace nLog
 			}
 			
 		private:
-			bool analyseField(const string& format, int begin, int end, int& bind_value);
+			bool analyseField(const string& format, int begin, int end, const int* bind_ptr);
 			void analyse(const string& format);
 
 		private:
-			time_t _now;
-			struct tm _tm;
-			int _year;
-			int _month;
-			vector<iAttr*> _attrs;		
-			char _buff[128];
+			const int* _year;
+			const int* _month;
+			const int* _day;
+			const int* _hour;
+			const int* _min;
+			const int* _sec;
+			const time_t* _timestamp;
+
+			attrList _attrs;		
+			char _buff[NLOGATTRBUF];
 			int _color;
 	};
 
@@ -180,8 +187,6 @@ namespace nLog
 		public:
 			messageAttr(const char* addr_ptr)
 				: _addr_ptr(addr_ptr){}
-
-			
 
 			virtual const char* get()
 			{

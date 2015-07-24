@@ -2,13 +2,13 @@
 
 namespace nLog
 {
-	bool timeAttr::analyseField(const string& format, int begin, int end, int& bind_value)
+	bool timeAttr::analyseField(const string& format, int begin, int end, const int* bind_ptr)
 	{
 		string temp = format.substr(begin, end - begin + 1);
 		if(!temp.empty())
 		{
 			temp[temp.size() - 1] = 'd';
-			_attrs.push_back((iAttr*)(new bindIntAttr(&bind_value, temp.c_str())));
+			_attrs.push_back((iAttr*)(new bindIntAttr(bind_ptr, temp.c_str())));
 		}
 		return true;
 	}
@@ -38,16 +38,16 @@ namespace nLog
 							flag = analyseField(temp, begin, i, _month);
 							break;
 						case 'd':
-							flag = analyseField(temp, begin, i, _tm.tm_mday);
+							flag = analyseField(temp, begin, i, _day);
 							break;
 						case 'H':
-							flag = analyseField(temp, begin, i, _tm.tm_hour);
+							flag = analyseField(temp, begin, i, _hour);
 							break;
 						case 'M':
-							flag = analyseField(temp, begin, i, _tm.tm_min);
+							flag = analyseField(temp, begin, i, _min);
 							break;
 						case 'S':
-							flag = analyseField(temp, begin, i, _tm.tm_sec);
+							flag = analyseField(temp, begin, i, _sec);
 							break;
 						case 's':
 						{
@@ -55,7 +55,7 @@ namespace nLog
 							if(!temp.empty())
 							{
 								temp[temp.size() - 1] = 'u';
-								_attrs.push_back((iAttr*)(new bindUIntAttr((unsigned*)(&_now), temp.c_str())));
+								_attrs.push_back((iAttr*)(new bindUIntAttr((const unsigned*)(_timestamp), temp.c_str())));
 							}
 							flag = true;
 							break;

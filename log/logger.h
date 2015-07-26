@@ -1,23 +1,23 @@
 #ifndef _LOG_LOGGER_H
 #define _LOG_LOGGER_H
 
+#include "helper.h"
+
 namespace nLog
 {
 	class logger
 	{
 		public:
-			
-
-
-		private:
-			void tick()
+			inline helper info()
 			{
-				_tickerMgr.tick();
+				return helper(&_log_impl);
 			}
-
+			void addLinker(iLinker* ptr)
+			{
+				_log_impl.addLinker(ptr);
+			}
 		private:
-			tickerMgr _tickerMgr;
-			
+			log_impl _log_impl;
 	};
 }
 

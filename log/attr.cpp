@@ -32,22 +32,22 @@ namespace nLog
 					switch(format[i])
 					{
 						case 'Y':
-							flag = analyseField(temp, begin, i, _year);
+							flag = analyseField(format, begin, i, _year);
 							break;
 						case 'm':
-							flag = analyseField(temp, begin, i, _month);
+							flag = analyseField(format, begin, i, _month);
 							break;
 						case 'd':
-							flag = analyseField(temp, begin, i, _day);
+							flag = analyseField(format, begin, i, _day);
 							break;
 						case 'H':
-							flag = analyseField(temp, begin, i, _hour);
+							flag = analyseField(format, begin, i, _hour);
 							break;
 						case 'M':
-							flag = analyseField(temp, begin, i, _min);
+							flag = analyseField(format, begin, i, _min);
 							break;
 						case 'S':
-							flag = analyseField(temp, begin, i, _sec);
+							flag = analyseField(format, begin, i, _sec);
 							break;
 						case 's':
 						{
@@ -80,3 +80,4 @@ namespace nLog
 		}
 	}
 }
+

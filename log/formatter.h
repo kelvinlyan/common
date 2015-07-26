@@ -3,21 +3,23 @@
 
 #include "attr.h"
 #include "ticker.h"
+#include "iLink.h"
 
 namespace nLog
 {
-	class formatter
+	class formatter : public iLinker
 	{
 		public:
 			formatter(tickerMgr& ticker_mgr)
-				: _tickerMgr(tickerMgr){}
+				: _tickerMgr(ticker_mgr){}
 
-			formatter& operator<<(const char* attr_name, const char* format = NULL, int color = nColor::DEFAULT)
+			formatter& operator<<(iAttr* attr_ptr)
 			{
-				_attrList.push_back(createAttr(attr_name, format, color));
+				_attrList.push_back(attr_ptr);
+				return *this;
 			}
 
-			const char* run(const char* str)
+			virtual const char* handle(const char* str)
 			{
 				_buff.clear();
 				FOREACH(attrList, iter, _attrList)

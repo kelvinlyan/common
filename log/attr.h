@@ -1,5 +1,5 @@
-#ifndef _Log_ATTR_H
-#define _Log_ATTR_H
+#ifndef _LOG_ATTR_H
+#define _LOG_ATTR_H
 
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -7,6 +7,7 @@
 #include <vector>
 #include "../macro/header.h"
 #include "../color/nColor.hpp"
+#include "ticker.h"
 using namespace std;
 
 namespace nLog
@@ -95,7 +96,7 @@ namespace nLog
 
 	CREATE_BINDATTR(int, bindIntAttr, "%d")
 	CREATE_BINDATTR(unsigned, bindUIntAttr, "%u")
-	CREATE_BINDATTR(const char, bindCStrAttr, "%s")
+	CREATE_BINDATTR(char*, bindCStrAttr, "%s")
 
 	class timeAttr : public iAttr
 	{

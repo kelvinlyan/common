@@ -11,9 +11,10 @@ namespace nLog
 	};
 
 
-	class iTicker()
+	class iTicker
 	{
 		public:
+			virtual ~iTicker(){}
 			virtual void tick() = 0;
 	};
 
@@ -64,7 +65,7 @@ namespace nLog
 			tickerMgr()
 			{
 				for(int i = 0; i < TMAX; ++i)
-					_tickerType = NULL;
+					_tickerType[i] = NULL;
 			}
 			~tickerMgr()
 			{

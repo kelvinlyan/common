@@ -2,37 +2,42 @@
 #define _LOG_FORMATTER_H
 
 #include "attr.h"
-#include "ticker.h"
 #include "iLink.h"
+#include "logger.h"
 
 namespace nLog
 {
 	class formatter : public iLinker
 	{
 		public:
-			formatter(tickerMgr& ticker_mgr)
-				: _tickerMgr(ticker_mgr){}
+			formatter(logger& l)
+				: _sharedData(l.getSharedData()){}
 
 			formatter& operator<<(iAttr* attr_ptr)
 			{
 				_attrList.push_back(attr_ptr);
+				messageAttr* ptr = dynamic_cast<messageAttr*>(attr_ptr);
+				if(ptr != NULL)
+					_messageAttr = (messageAttr*)attr_ptr;
 				return *this;
 			}
 
-			virtual const char* handle(const char* str)
+			virtual const char* handle(const char* pstr)
 			{
 				_buff.clear();
+				_messageAttr->setMsgPtr(pstr);
 				FOREACH(attrList, iter, _attrList)
 					_buff += (*iter)->get();
 				return _buff.c_str();
 			}
-		private:
-			iAttr* createAttr(const char* attr_name, const char* format, int color);
+
+			iAttr* createAttr(const char* attr_name, const char* format = NULL, int color = nColor::DEFAULT);
 
 		private:
-			tickerMgr& _tickerMgr;
+			sharedData& _sharedData;
 			attrList _attrList;
 			string _buff;
+			messageAttr* _messageAttr;
 	};
 }
 

@@ -6,7 +6,7 @@ namespace nLog
 	{
 		string temp = format.substr(begin, end - begin + 1);
 		if(!temp.empty())
-		{
+		{ 
 			temp[temp.size() - 1] = 'd';
 			_attrs.push_back((iAttr*)(new bindIntAttr(bind_ptr, temp.c_str())));
 		}

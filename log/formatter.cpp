@@ -7,13 +7,13 @@ namespace nLog
 	{
 		if(strcmp(attr_name, "TIME") == 0)
 		{
-			timeTicker* time_ticker = (timeTicker*)_tickerMgr.getTickerByType(TTIME);		
-			return new timeAttr(time_ticker, format, color);
+			dTime* time_data = (dTime*)_sharedData.getDataByType(DTIME);		
+			return new timeAttr(time_data, format, color);
 		}
 		if(strcmp(attr_name, "LINEID") == 0)
 		{
-			lineIdTicker* line_id_ticker = (lineIdTicker*)_tickerMgr.getTickerByType(TLINEID);
-			return new lineIdAttr(line_id_ticker, format, color);
+			dLineId* line_id_data = (dLineId*)_sharedData.getDataByType(DLINEID);
+			return new lineIdAttr(line_id_data, format, color);
 		}
 		if(strcmp(attr_name, "CONSTANT") == 0)
 		{
@@ -25,7 +25,8 @@ namespace nLog
 		}
 		if(strcmp(attr_name, "MESSAGE") == 0)
 		{
-			return NULL;//new messageAttr();
+			return new messageAttr();
 		}
+		return NULL;
 	}
 }

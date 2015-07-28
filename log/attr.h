@@ -7,7 +7,7 @@
 #include <vector>
 #include "../macro/header.h"
 #include "../color/nColor.hpp"
-#include "ticker.h"
+#include "shared_data.h"
 using namespace std;
 
 namespace nLog
@@ -56,9 +56,9 @@ namespace nLog
 	class lineIdAttr : public iAttr
 	{
 		public:
-			lineIdAttr(lineIdTicker* line_id_ticker, const char* format = NULL, int color = nColor::DEFAULT)
+			lineIdAttr(dLineId* line_id_data, const char* format = NULL, int color = nColor::DEFAULT)
 			{
-				_line_id = line_id_ticker->getLineId();
+				_line_id = line_id_data->getLineId();
 				_format = format? format : "%u";
 				_format = nColor::makeFormat(_format.c_str(), color);
 			}
@@ -101,16 +101,16 @@ namespace nLog
 	class timeAttr : public iAttr
 	{
 		public:
-			timeAttr(timeTicker* time_ticker, const string& format, int color = nColor::DEFAULT)
+			timeAttr(dTime* time_data, const string& format, int color = nColor::DEFAULT)
 				: _color(color)
 			{
-				_year = time_ticker->getYear();
-				_month = time_ticker->getMonth();
-				_day = time_ticker->getDay();
-				_hour = time_ticker->getHour();
-				_min = time_ticker->getMin();
-				_sec = time_ticker->getSec();
-				_timestamp = time_ticker->getTimeStamp();
+				_year = time_data->getYear();
+				_month = time_data->getMonth();
+				_day = time_data->getDay();
+				_hour = time_data->getHour();
+				_min = time_data->getMin();
+				_sec = time_data->getSec();
+				_timestamp = time_data->getTimeStamp();
 
 				analyse(format);
 			}
@@ -186,16 +186,20 @@ namespace nLog
 	class messageAttr : public iAttr
 	{
 		public:
-			messageAttr(const char* addr_ptr)
-				: _addr_ptr(addr_ptr){}
+			messageAttr(){}
+			
+			void setMsgPtr(const char* pstr)
+			{
+				_msg_ptr = pstr;
+			}
 
 			virtual const char* get()
 			{
-				return _addr_ptr;
+				return _msg_ptr;
 			}
 
 		private:
-			const char* _addr_ptr;
+			const char* _msg_ptr;
 	};
 }
 

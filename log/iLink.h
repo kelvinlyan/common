@@ -1,6 +1,7 @@
 #ifndef _LOG_ILINK_H
 #define _LOG_ILINK_H
 
+#include "../macro/header.h"
 #include <vector>
 using namespace std;
 
@@ -22,7 +23,7 @@ namespace nLog
 			{
 				const char* re_pstr = handle(pstr);			
 				FOREACH(linkerList, iter, _linkerList)
-					run(re_pstr);
+					(*iter)->run(re_pstr);
 			}
 
 			virtual const char* handle(const char* pstr) = 0;

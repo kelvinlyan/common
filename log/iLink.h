@@ -1,20 +1,20 @@
 #ifndef _LOG_ILINK_H
 #define _LOG_ILINK_H
 
-#include "../macro/header.h"
+#include "../macro/macro_header.h"
 #include <vector>
 using namespace std;
 
 namespace nLog
 {
-	class iLinker;
+	class iLink;
 
-	typedef vector<iLinker*> linkerList;
+	typedef vector<iLink*> linkerList;
 
-	class iLinker
+	class iLink
 	{
 		public:
-			void addLinker(iLinker* ptr)
+			void push(iLink* ptr)
 			{
 				_linkerList.push_back(ptr);
 			}
@@ -25,7 +25,7 @@ namespace nLog
 				FOREACH(linkerList, iter, _linkerList)
 					(*iter)->run(re_pstr);
 			}
-
+		
 			virtual const char* handle(const char* pstr) = 0;
 
 		private:

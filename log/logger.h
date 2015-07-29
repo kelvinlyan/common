@@ -2,14 +2,13 @@
 #define _LOG_LOGGER_H
 
 #include "implement.h"
-#include "writer.h"
 
 namespace nLog
 {
 	class helper
 	{
 		public:
-			helper(implement* ptr)
+			helper(implement* ptr, int severity)
 				: _impl_ptr(ptr)
 			{
 				_impl_ptr->preLog();
@@ -31,18 +30,13 @@ namespace nLog
 	class logger
 	{
 		public:
-			inline helper info()
+			inline helper log(int severity = 0)
 			{
-				return helper(&_impl);
+				return helper(&_impl, severity);
 			}
-			void addLinker(iLinker* ptr)
+			void push(iLink* ptr)
 			{
-				_impl.addLinker(ptr);
-			}
-
-			sharedData& getSharedData()
-			{
-				return _impl.getSharedData();
+				_impl.push(ptr);
 			}
 		private:
 			implement _impl;

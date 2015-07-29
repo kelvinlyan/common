@@ -6,12 +6,12 @@
 
 namespace nLog
 {
-	class printer : public iLinker
+	class printer : public iLink
 	{
 		public:
 			virtual const char* handle(const char* pstr)
 			{
-				printf("%s", pstr);
+				printf("%s\n", pstr);
 				return pstr;
 			}
 	};

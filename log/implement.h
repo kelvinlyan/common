@@ -7,16 +7,27 @@ using namespace std;
 
 namespace nLog
 {
+	enum
+	{
+		INFO = 0,
+		WARM,
+		ERROR,
+		DEBUG,
+		SMAX
+	};
+
+	const char* severityStr[SMAX] = { "INFO", "WARM", "ERROR", "DEBUG" };
+
 	class implement : public iLink
 	{
 		public:
-			inline void preLog()
+			inline void preLog(int severity)
 			{
-			
+				_buff.clear();
+				_severityPtr = severityStr[severity];
 			}
 			inline void doLog()
 			{
-				_buff.clear();
 				run(_buff.c_str());
 			}
 			
@@ -30,9 +41,11 @@ namespace nLog
 				_buff += pstr;
 				return *this;
 			}
+			const char* const * getSeverityPtr() const { return &_severityPtr; }
 
 		private:
 			string _buff;
+			const char* _severityPtr;
 	};
 }
 

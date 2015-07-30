@@ -2,33 +2,78 @@
 #define _LOG_WRITER_H
 
 #include <string.h>
+#include <unistd.h>
+#include <stdio.h>
 #include "../macro/macro_header.h"
 #include "../file/file_header.h"
 #include "attr.h"
 
 namespace nLog
 {
-	class fileName
+	class writer : public iLink
 	{
 		public:
-			void push(iAttr* attr_ptr)
+			writer()
+				: _timePtr(NULL), _counter(NULL), _time_size(0), _byte_size(0), _init(false){}
+			writer& operator<<(nAttr::iAttr* attr_ptr)
 			{
-				_attrList.push_back(attr_ptr);
+				if(!_init)
+				{
+					_attrList.push_back(attr_ptr);
+					nAttr::nTime* ptr = dynamic_cast<nAttr::nTime*>(attr_ptr);
+					if(ptr != NULL)
+						_timePtr = ptr;
+					nAttr::counter* ptr_2 = dynamic_cast<nAttr::counter*>(attr_ptr);
+					if(ptr != NULL)
+						_counter = ptr_2;
+				}
+				return *this;
+			}
+			virtual ~writer()
+			{
+				FOREACH(nAttr::attrList, iter, _attrList)
+					delete *iter;
+				if(_fptr)
+					fclose(_fptr);
+			}
+			void open()
+			{
+				_init = true;
+				_buff = getNewFileName();
+				if(_time_size != 0)
+					_next_update_time = getNextUpdateTime(time(NULL));
+				if(_byte_size != 0)
+					_current_size = getCurrentSize();
 			}
 			void setByteSize(unsigned size)
 			{
-				_byte_size = size;
+				if(!_init)
+					_byte_size = size;
 			}
 			void setTimeSize(unsigned size)
 			{
-				_time_size = size;
+				if(!_init)
+					_time_size = size;
 			}
-			const char* getName()
+			virtual const char* handle(const char* pstr)
 			{
-				checkAndUpdate();
-				return _buff.c_str();
+				if(_init)
+				{
+					checkAndUpdate();
+					fwrite(pstr, strlen(pstr), 1, _fptr);
+					fwrite("\n", 1, 1, _fptr);
+				}
+				return pstr;
 			}
 		private:
+			string getFilePath(const string& temp)
+			{
+				string str = "";
+				int index = temp.rfind('/');
+				if(index != string::npos)
+					str = temp.substr(0, index);
+				return str;
+			}
 			void checkAndUpdate()
 			{
 				if(_time_size != 0)
@@ -36,22 +81,76 @@ namespace nLog
 					unsigned now = time(NULL);
 					if(now >= _next_update_time)
 					{
-						
+						if(_timePtr)
+							_timePtr->setTime(now / _time_size * _time_size);
+						_buff = getNewFileName();
 						_next_update_time = getNextUpdateTime(now);
-						_getName();
 						_current_size = getCurrentSize();
 					}
 				}
 				if(_byte_size != 0 && _current_size >= _byte_size)
 				{
-					
+					if(_timePtr && _time_size != 0)
+						_timePtr->setTime(time(NULL) / _time_size * _time_size);
+					_buff = getNewFileName();
+					_current_size = getCurrentSize();
 				}
 			}
-			void _getName()
+			string getNewFileName()
 			{
-				_buff.clear();
-				FOREACH(attrList, iter, _attrList)
-					_buff += (*iter)->get();
+				string str;
+				do
+				{
+					str = _getName();			
+					if(nFile::isFileExist(str.c_str()) 
+						&& _byte_size != 0 
+						&& nFile::getFileSize(str.c_str()) < _byte_size)
+					{
+						if(!_fptr)
+							fclose(_fptr);
+						string path = getFilePath(str);
+						if(path != "")
+							nFile::mkDir(path.c_str());
+						_fptr = fopen(str.c_str(), "a");
+						return str;
+					}
+				}
+				while(nFile::isFileExist(str.c_str()) && _counter != NULL);
+				
+				if(!nFile::isFileExist(str.c_str()))
+				{
+					if(!_fptr)
+						fclose(_fptr);
+					string path = getFilePath(str);
+					if(path != "")
+						nFile::mkDir(path.c_str());
+					_fptr = fopen(str.c_str(), "a");
+					return str;
+				}
+
+				string temp = str;
+				unsigned count = 1;
+				while(nFile::isFileExist(temp.c_str()))
+				{
+					ostringstream os;
+					os << "-" << count++;
+					temp += os.str();
+				}
+				rename(str.c_str(), temp.c_str());
+				if(!_fptr)
+					fclose(_fptr);
+				string path = getFilePath(str);
+				if(path != "")
+					nFile::mkDir(path.c_str());
+				_fptr = fopen(str.c_str(), "a");
+				return str;
+			}
+			string _getName()
+			{
+				string str;
+				FOREACH(nAttr::attrList, iter, _attrList)
+					str += (*iter)->get();
+				return str;
 			}
 			unsigned getNextUpdateTime(unsigned now)
 			{
@@ -64,64 +163,21 @@ namespace nLog
 			}
 
 		private:
-			attrList _attrList;
-			timeAttr* timeAttrPtr;
+			bool _init;
+			nAttr::attrList _attrList;
+			nAttr::nTime* _timePtr;
+			nAttr::counter* _counter;
 			string _buff;
+			FILE* _fptr;
 
 			unsigned _time_size;
 			unsigned _next_update_time;
 			unsigned _byte_size;
 			unsigned _current_size;
-	};
-
-	class writer : public iLink
-	{
-		public:
-			writer(logger& lg)
-				: _sharedData(lg.getSharedData()), _byte_size(0), _time_size(0)
-			{
-			}
-			void setByteSize(unsigned size)
-			{
-				_file_name.setByteSize(size);
-			}
-			void setTimeSize(unsigned size)
-			{
-				_file_name.setTimeSize(size);
-			}
-			writer& operator<<(iAttr* attr_ptr)
-			{
-				_file_name.push(attr_ptr);
-				return *this;
-			}
-			virtual const char* handle(const char* pstr)
-			{
-				_handle(pstr);
-				return pstr;
-			}
-
-		private:
-			string getFileName();
-			void _handle(const char* pstr)
-			{
-				string name = getFileName();
-				fwrite(pstr, strlen(pstr) + 1, 1, _fptr);
-			}
-
-		private:
-			FILE* _fptr;
-			string _fname;
-
-			unsigned _byte_size;
-			unsigned _time_size;
-			fileName _file_name;
 
 			int _vbuf_type;
 			char* _vbuf_ptr;
 			unsigned _vbuf_size;
-
-			sharedData& _sharedData;
-			attrList _attrList;
 	};
 }
 

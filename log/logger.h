@@ -11,7 +11,7 @@ namespace nLog
 			helper(implement* ptr, int severity)
 				: _impl_ptr(ptr)
 			{
-				_impl_ptr->preLog();
+				_impl_ptr->preLog(severity);
 			}
 			~helper()
 			{
@@ -30,7 +30,7 @@ namespace nLog
 	class logger
 	{
 		public:
-			inline helper log(int severity = 0)
+			inline helper rcd(int severity = INFO)
 			{
 				return helper(&_impl, severity);
 			}
@@ -38,6 +38,7 @@ namespace nLog
 			{
 				_impl.push(ptr);
 			}
+			const char* const* getSeverity() const { return _impl.getSeverityPtr(); }
 		private:
 			implement _impl;
 	};

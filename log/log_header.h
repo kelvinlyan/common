@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "formatter.h"
 #include "printer.h"
+#include "writer.h"
 
 #endif
 

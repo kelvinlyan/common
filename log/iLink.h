@@ -14,7 +14,7 @@ namespace nLog
 	class iLink
 	{
 		public:
-			void push(iLink* ptr)
+			virtual void push(iLink* ptr)
 			{
 				_linkerList.push_back(ptr);
 			}

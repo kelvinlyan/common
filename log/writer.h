@@ -14,7 +14,7 @@ namespace nLog
 	{
 		public:
 			writer()
-				: _timePtr(NULL), _counter(NULL), _time_size(0), _byte_size(0), _init(false){}
+				: _timePtr(NULL), _counter(NULL), _time_size(0), _byte_size(0), _init(false), _fptr(NULL){}
 			writer& operator<<(nAttr::iAttr* attr_ptr)
 			{
 				if(!_init)
@@ -106,7 +106,7 @@ namespace nLog
 						&& _byte_size != 0 
 						&& nFile::getFileSize(str.c_str()) < _byte_size)
 					{
-						if(!_fptr)
+						if(_fptr)
 							fclose(_fptr);
 						string path = getFilePath(str);
 						if(path != "")
@@ -119,7 +119,7 @@ namespace nLog
 				
 				if(!nFile::isFileExist(str.c_str()))
 				{
-					if(!_fptr)
+					if(_fptr)
 						fclose(_fptr);
 					string path = getFilePath(str);
 					if(path != "")
@@ -137,7 +137,7 @@ namespace nLog
 					temp += os.str();
 				}
 				rename(str.c_str(), temp.c_str());
-				if(!_fptr)
+				if(_fptr)
 					fclose(_fptr);
 				string path = getFilePath(str);
 				if(path != "")

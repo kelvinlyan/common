@@ -1,11 +1,11 @@
-#ifndef _COMMON_NONCOPYABLE_H
-#define _COMMON_NONCOPYABLE_H
+#ifndef _NONCOPYABLE_H
+#define _NONCOPYABLE_H
 
 class noncopyable
 {
 	protected:
 		noncopyable(){}
-		~noncopyable(){}
+		virtual ~noncopyable(){}
 	private:
 		noncopyable(const noncopyable&);
 		const noncopyable& operator=(const noncopyable&);

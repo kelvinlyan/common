@@ -3,10 +3,9 @@
 
 #include <pthread.h>
 #include "noncopyable.h"
+#include "macro.h"
 
-typedef void(thread_fn)(void*);
-
-void* thread_routine(void* arg);
+typedef void*(thread_fn)(void*);
 
 class thread 
 	: public noncopyable
@@ -16,9 +15,7 @@ class thread
 
 		void start(thread_fn* tfn, void* arg)
 		{
-			_tfn = tfn;
-			_arg = arg;
-			int rc = pthread_create(&_tid, NULL, thread_routine, this);
+			int rc = pthread_create(&_tid, NULL, tfn, arg);
 			posix_assert(rc);
 		}
 		
@@ -31,17 +28,7 @@ class thread
 		friend void* thread_routine(void* arg);
 
 	private:
-		thread_fn* _tfn;
-		void* _arg;
-
 		pthread_t _tid;
 };
-
-void* thread_routine(void* arg)
-{
-	thread* self = (thread*)arg;
-	self->_tfn(self->_arg);
-	return NULL;
-}
 
 #endif

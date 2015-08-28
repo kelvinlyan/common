@@ -5,7 +5,7 @@
 #include "poller.h"
 #include <sys/types.h>
 #include <string>
-
+#include <vector>
 
 class session
 	: public i_poll_events
@@ -33,8 +33,12 @@ class session
 
 		void* _buff;
 		size_t _size;
+		
+		int _free_buff_index;
+		std::string _send_buffs[2];
 
-		std::string _send_buff;
+	//	uint32_t _pollout_count;
+	//	mutex _pollout_count_mutex;
 
 		poller* _poller;
 };

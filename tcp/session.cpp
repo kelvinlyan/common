@@ -10,6 +10,8 @@
 session::session()
 {
 	_fd = -1;
+	_free_buff_index = 0;
+	//_pollout_count = 0;
 	_poller = new poller();
 	_poller->start();
 }
@@ -57,6 +59,8 @@ int session::syn_connect(const char* addr)
 	rc = ::connect(_fd, (struct sockaddr*)&sock_addr, addr_len);
 	errno_assert(rc == 0);
 
+	_poller->add_fd(_fd, this);
+
 	return rc;
 }
 
@@ -83,8 +87,8 @@ int session::close()
 
 void session::async_send(const void* buff, size_t size)
 {
-	_send_buff.assign((const char*)buff, size);
-	_poller->add_fd(_fd, this);
+	_send_buffs[_free_buff_index].insert(_send_buffs[_free_buff_index].end()
+		, (const char*)buff, (const char*)buff + size);
 	_poller->set_pollout(_fd);
 }
 
@@ -92,21 +96,29 @@ void session::async_recv(void* buff, size_t size)
 {
 	_buff = buff;
 	_size = size;
-	_poller->add_fd(_fd, this);
 	_poller->set_pollin(_fd);
 }
 
 void session::in_event()
 {
-	::recv(_fd, _buff, _size, 0);
-	printf("%s\n", _buff);
+	ssize_t size = syn_recv(_buff, _size);
+	printf("in: (%d)", size);
+	for(int i = 0; i < size; ++i)
+		printf("%c", ((char*)_buff)[i]);
+	printf("\n");
 	_poller->reset_pollin(_fd);
 }
 
 void session::out_event()
 {
-	::send(_fd, _send_buff.c_str(), _send_buff.size(), 0);
-	printf("%s\n", _send_buff.c_str());
+	int working_buff_index = _free_buff_index;
+	_free_buff_index = _free_buff_index == 0? 1 : 0;
+	syn_send(_send_buffs[working_buff_index].c_str(), _send_buffs[working_buff_index].size());
+	printf("out: (%d)", _send_buffs[working_buff_index].size());
+	for(int i = 0; i < _send_buffs[working_buff_index].size(); ++i)
+		printf("%c", _send_buffs[working_buff_index][i]);
+	printf("\n");
+	_send_buffs[working_buff_index].clear();
 	_poller->reset_pollout(_fd);
 }
 

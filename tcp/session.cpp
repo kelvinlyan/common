@@ -1,5 +1,7 @@
 #include "session.h"
+#include "ctx.h"
 #include "../base/macro.h"
+#include "../base/file_descriptor.h"
 #include <sys/socket.h>
 #include <string.h>
 #include <string>
@@ -11,17 +13,22 @@ session::session()
 {
 	_fd = -1;
 	_free_buff_index = 0;
-	//_pollout_count = 0;
-	_poller = new poller();
-	_poller->start();
+	_connected = false;
+	_poller = ctx::shared().get_poller();
+}
+
+void session::set_async_handler(async_handler* h)
+{
+	_async_handler = h;
 }
 
 void session::set_fd(int fd)
 {
 	_fd = fd;
+	_connected = true;
 }
 
-int session::syn_connect(const char* addr)
+int session::connect(const char* addr, bool async)
 {
 	_fd = socket(AF_INET, SOCK_STREAM, 0);
 	errno_assert(_fd != -1);
@@ -56,12 +63,33 @@ int session::syn_connect(const char* addr)
 
 	socklen_t addr_len = sizeof(sock_addr);
 
-	rc = ::connect(_fd, (struct sockaddr*)&sock_addr, addr_len);
-	errno_assert(rc == 0);
-
-	_poller->add_fd(_fd, this);
+	if(async)
+	{
+		FD::set_nonblock(_fd);
+		::connect(_fd, (struct sockaddr*)&sock_addr, addr_len);
+		_poller->add_fd(_fd, this);
+		_poller->set_pollout(_fd);
+	}
+	else
+	{
+		rc = ::connect(_fd, (struct sockaddr*)&sock_addr, addr_len);
+		errno_assert(rc == 0);
+		_connected = true;
+		_poller->add_fd(_fd, this);
+	}
 
 	return rc;
+}
+
+
+int session::syn_connect(const char* addr)
+{
+	return connect(addr, false);
+}
+
+int session::async_connect(const char* addr)
+{
+	return connect(addr, true);
 }
 
 ssize_t session::syn_send(const void* buff, size_t size)
@@ -111,6 +139,15 @@ void session::in_event()
 
 void session::out_event()
 {
+	if(!_connected)
+	{
+		_connected = true;
+		FD::set_block(_fd);
+		_poller->reset_pollout(_fd);
+		printf("connected\n");
+		return;
+	}
+
 	int working_buff_index = _free_buff_index;
 	_free_buff_index = _free_buff_index == 0? 1 : 0;
 	syn_send(_send_buffs[working_buff_index].c_str(), _send_buffs[working_buff_index].size());

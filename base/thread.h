@@ -25,8 +25,6 @@ class thread
 			posix_assert(rc);
 		}
 
-		friend void* thread_routine(void* arg);
-
 	private:
 		pthread_t _tid;
 };

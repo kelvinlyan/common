@@ -15,12 +15,14 @@ class session
 		virtual ~session(){}
 
 		void set_fd(int fd);
-
+		void set_async_handler(async_handler* h);
+		
 		int syn_connect(const char* addr);
 		ssize_t syn_send(const void* buff, size_t size);
 		ssize_t syn_recv(void* buff, size_t size);
 		int close();
 		
+		int async_connect(const char* addr);
 		void async_send(const void* buff, size_t size);
 		void async_recv(void* buff, size_t size);
 		
@@ -29,6 +31,8 @@ class session
 		virtual void timer_event(int id){}
 
 	private:
+		int connect(const char* addr, bool async);
+
 		int _fd;
 
 		void* _buff;
@@ -39,8 +43,10 @@ class session
 
 	//	uint32_t _pollout_count;
 	//	mutex _pollout_count_mutex;
+		bool _connected;
 
 		poller* _poller;
+		async_handler* _async_handler;
 };
 
 #endif

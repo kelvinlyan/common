@@ -2,6 +2,7 @@
 #define _SERVER_H
 
 class session;
+class async_handler;
 
 class server
 {
@@ -11,6 +12,7 @@ class server
 		int syn_accept(session* s);
 		void async_accept(session* s)
 		{}
+		void set_async_handler(async_handler* h);
 
 	protected:
 		virtual void handle_async_accept(int error)
@@ -18,6 +20,8 @@ class server
 
 	private:
 		int _fd;
+
+		async_handler* _async_handler;
 };
 
 #endif

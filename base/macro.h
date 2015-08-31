@@ -30,7 +30,7 @@
 #define base_assert(x)\
     do{\
         if(!(x)){\
-            fprintf(stderr, "(%s) is false (%s:%d)\n", #x, __FILE__, __LINE__);\
+            fprintf(stderr, "assertion failed: (%s) (%s:%d)\n", #x, __FILE__, __LINE__);\
         }\
     }while(false)
 

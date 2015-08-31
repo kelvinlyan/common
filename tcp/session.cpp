@@ -26,6 +26,7 @@ void session::set_fd(int fd)
 {
 	_fd = fd;
 	_connected = true;
+	_poller->add_fd(fd, this);
 }
 
 int session::connect(const char* addr, bool async)
@@ -60,7 +61,6 @@ int session::connect(const char* addr, bool async)
 		return -1;
 
 	sock_addr.sin_port = htons(port);
-
 	socklen_t addr_len = sizeof(sock_addr);
 
 	if(async)

@@ -61,24 +61,24 @@ void select_t::rm_fd(int fd)
 	}
 }
 
-void select_t::set_pollin (int fd)
+void select_t::set_pollin(int fd)
 {
-    FD_SET (fd, &_source_in);
+    FD_SET(fd, &_source_in);
 }
 
-void select_t::reset_pollin (int fd)
+void select_t::reset_pollin(int fd)
 {
-    FD_CLR (fd, &_source_in);
+    FD_CLR(fd, &_source_in);
 }
 
-void select_t::set_pollout (int fd)
+void select_t::set_pollout(int fd)
 {
-    FD_SET (fd, &_source_out);
+    FD_SET(fd, &_source_out);
 }
 
-void select_t::reset_pollout (int fd)
+void select_t::reset_pollout(int fd)
 {
-    FD_CLR (fd, &_source_out);
+    FD_CLR(fd, &_source_out);
 }
 
 void* select_t::worker_routine(void* arg)
@@ -102,8 +102,8 @@ void select_t::loop()
 
 		int timeout = 1000;
 
-        struct timeval tv = {(long) (timeout / 1000),
-            (long) (timeout % 1000 * 1000)};
+        struct timeval tv = {(long)(timeout / 1000),
+            (long)(timeout % 1000 * 1000)};
 
 		int rc = ::select(_max_fd + 1, &_read_fds, &_write_fds, &_except_fds, &tv);
 

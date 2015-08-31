@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+class async_handler;
+
 class session
 	: public i_poll_events
 {

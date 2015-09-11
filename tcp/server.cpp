@@ -1,5 +1,6 @@
 #include "server.h"
 #include "session.h"
+#include "ctx.h"
 #include "../base/macro.h"
 #include <sys/socket.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 
 server::server()
 {
+	_poller = ctx::shared().get_poller();
 }
 
 int server::bind(const char* addr)
@@ -52,6 +54,8 @@ int server::bind(const char* addr)
 	rc = ::listen(_fd, 5);
 	errno_assert(rc == 0);
 
+	_poller->add_fd(_fd, this);
+
 	return rc;
 }	
 
@@ -64,3 +68,34 @@ int server::syn_accept(session* s)
 	errno_assert(cli_fd != -1);	
 	return 0;
 }
+
+void server::async_accept(session* s, async_fn* fn, void* arg)
+{
+	_async_session = s;
+	_async_fn = fn;
+	_arg = arg;
+
+	_poller->set_pollin(_fd);
+}
+
+void server::in_event()
+{
+	_poller->set_pollout(_fd);
+	int rc = syn_accept(_async_session);
+	if(!_async_fn.empty())
+	{
+		_async_fn(rc);
+		_async_fn.reset();
+	}
+}
+
+void server::out_event()
+{
+	base_assert(false);
+}
+
+void server::timer_event(int id)
+{
+	base_assert(false);
+}
+

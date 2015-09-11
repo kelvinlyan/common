@@ -12,14 +12,14 @@ namespace gg
 	{
 		enum
 		{
-			_stopped = 0,
-			_loading,
-			_running
+			_loading = 0,
+			_running,
+			_stopped
 		};
 
 		enum
 		{
-			_defeat_npc = 0,
+			_defeat_npc = 1,
 			_npc_progress,
 			_ruler_title,
 			_arena_rank,
@@ -35,8 +35,8 @@ namespace gg
 			public:
 				
 				//virtual void initData(const Json::Value& info) = 0;
-				virtual void start() = 0;
-				virtual void stop() = 0;
+				virtual ~i_base(){}
+				virtual void load() = 0;
 				virtual void update(playerDataPtr d) = 0;
 				virtual Json::Value getInfo(playerDataPtr d = playerDataPtr()) = 0;
 			
@@ -93,6 +93,8 @@ namespace gg
 		class rankList_1
 		{	
 			public:
+				typedef boost::function<void(const T&)> handler; 
+
 				rankList_1();
 				void setParam(unsigned max_size, unsigned client_size);
 				void update(const T& item, int oInterval = -1);
@@ -102,10 +104,12 @@ namespace gg
 				const T& max() const;
 				const T& min() const;
 
+				void run(handler h);
+				void print();
+
 			private:
 				bool erase(int id, int interval);
 				void insert(const T& item);
-
 
 				typedef std::list<T> rankItems;
 				struct rankItemsWithCount
@@ -120,6 +124,32 @@ namespace gg
 				unsigned _client_size;
 				int _max_interval;
 				int _min_interval;
+		};
+
+		class data_package
+		{
+			public:
+				typedef std::map<int, Json::Value> pid_info;
+
+				bool loadDB(int key_id);
+				bool saveDB(int key_id);
+
+				void insert(int player_id, Json::Value info);
+
+				const Json::Value& getInfo() const { return _value; }
+				const Json::Value& getPInfo(int player_id) const
+				{
+					pid_info::const_iterator iter = _pid_infos.find(player_id);
+					if(iter == _pid_infos.end())
+						return _null;
+					return iter->second;
+				}
+
+			private:
+				static Json::Value _null;
+				pid_info _pid_infos;
+
+				Json::Value _value;
 		};
 
 		class levelItem : public rankItem_1
@@ -154,18 +184,18 @@ namespace gg
 		{
 			public:
 				defeat_npc(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
 
-				void run();
-
 				static void setNpcId(int id){ _current_npc_id = id; }
+
+				void end_load();
+
 			private:
 				int getRank(int player_id);
-				void loadDB_1();
-				void loadDB_2();
+				void loadDB();
+				void stop();
 
 				struct helper
 				{
@@ -195,18 +225,21 @@ namespace gg
 				unsigned _end_time;
 
 				bool _rewarded;
+				data_package _package;
 
 				Json::Value _records;
 				typedef std::map<int, int> playerId_ranks;
 				playerId_ranks _playerId_ranks;
+
+				Json::Value _reward_info;
+				int _reward_type;
 		};
 
 		class npc_progress : public i_base
 		{
 			public:
 				npc_progress(const Json::Value& info){}
-				virtual void start(){}
-				virtual void stop(){}
+				virtual void load(){}
 				virtual void update(playerDataPtr d){}
 				virtual Json::Value getInfo(playerDataPtr d){ return Json::nullValue; }
 		};
@@ -215,8 +248,7 @@ namespace gg
 		{
 			public:
 				ruler_title(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
 
@@ -228,60 +260,112 @@ namespace gg
 		{
 			public:
 				arena_rank(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
 
+				void stop();
+				void end_load();
+
 			private:
-				Json::Value _arena_infos;
+				unsigned _max_size;
+				unsigned _client_size;
+				unsigned _end_time;
+				bool _rewarded;
+
+				data_package _package;
+
+				Json::Value _reward_info;
+				int _reward_type;
 		};
 
 		class level_rank : public i_base
 		{
 			public:
 				level_rank(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
-				void run();
+				void end_load();
+				void run(const levelItem& item);
 				
 				static void setLv(int olv){ _oLv = olv; }
+
 			private:
-				static int _oLv;
+				void loadDB();
+				void stop();
 
 				typedef std::vector<levelItem> cache_list;
 				cache_list _cache_list;
 				rankList_1<levelItem, 101> _rankList;
+
+				data_package _package;
+
+				unsigned _end_time;
+
+				bool _rewarded;
+				Json::Value _reward_info;
+				int _reward_type;
+
+				string _name;
+
+				int _rank_helper;
+				std::vector<Json::Value> _reward_package;
+
+				static int _oLv;
 		};
 
 		class office_rank : public i_base
 		{
 			public:
 				office_rank(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
-				void run();
+				void end_load();
+
+				void run(const officeItem& item);
+
+				static void setLv(int lv){ _oLv = lv; }
+				void loadDB();
 
 			private:
-				static int _oLv;
+				void stop();
+
 				typedef std::vector<officeItem> cache_list;
 				cache_list _cache_list;
 
 				rankList_1<officeItem, 51> _rankList;
+
+				data_package _package;
+
+				unsigned _end_time;
+
+				bool _rewarded;
+				Json::Value _reward_info;
+				int _reward_type;
+
+				string _name;
+
+				int _rank_helper;
+				std::vector<Json::Value> _reward_package;
+
+				static int _oLv;
 		};
 
 		class guild_rank : public i_base
 		{
 			public:
 				guild_rank(const Json::Value& info);
-				virtual void start();
-				virtual void stop();
+				virtual void load();
 				virtual void update(playerDataPtr d);
 				virtual Json::Value getInfo(playerDataPtr d);
+
+			private:
+				bool _rewarded;
+				data_package _package;
+				unsigned _client_size;
+				unsigned _max_size;
 		};
 
 		static inline basePtr create(const Json::Value& info)

@@ -43,6 +43,7 @@ class session
 		int _free_buff_index;
 		std::string _send_buffs[2];
 
+
 	//	uint32_t _pollout_count;
 	//	mutex _pollout_count_mutex;
 		bool _connected;

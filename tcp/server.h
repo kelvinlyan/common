@@ -1,27 +1,32 @@
 #ifndef _SERVER_H
 #define _SERVER_H
 
+#include "i_poll_events.h"
+#include "poller.h"
+#include "async_fn.h"
+
 class session;
-class async_handler;
 
 class server
+	: public i_poll_events
 {
 	public:
 		server();
 		int bind(const char* addr);
 		int syn_accept(session* s);
-		void async_accept(session* s)
-		{}
-		void set_async_handler(async_handler* h);
+		void async_accept(session* s, async_fn fn);
 
-	protected:
-		virtual void handle_async_accept(int error)
-		{}
+		virtual void in_event();
+		virtual void out_event();
+		virtual void timer_event(int id);
 
 	private:
 		int _fd;
 
-		async_handler* _async_handler;
+		session* _async_session;
+		async_fn _async_fn;
+
+		poller* _poller;
 };
 
 #endif

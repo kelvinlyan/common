@@ -1,4 +1,5 @@
 #include "bgActivity_helper.h"
+#include "arena_system.h"
 #include "game_server.h"
 #include "playerManager.h"
 #include "player_war_story.h"
@@ -6,6 +7,7 @@
 #include "timmer.hpp"
 #include "commom.h"
 #include "player_office.h"
+#include "guild_system.h"
 
 namespace gg
 {
@@ -109,20 +111,30 @@ namespace gg
 				return -1;
 
 			rankItemsWithCount& r = _rankInfo[interval];
+			bool found = false;
 			int rank = r._count + 1;
 			ForEach(typename rankItems, iter, r._items)
 			{
 				if(iter->getId() != id)
 					++rank;
 				else
+				{
+					found = true;
 					break;
+				}
 			}
-			return rank > _max_size? -1 : _max_size;
+			if(!found)
+				rank = -1;
+			else
+				rank = rank > _max_size? -1 : rank;
+
+			return rank;
 		}
 
 		template<typename T, int N>
 		Json::Value rankList_1<T, N>::getInfo()
 		{
+			print();
 			Json::Value rank_list = Json::arrayValue;
 			unsigned count = 0;
 			for(int i = N - 1; i >= 0; --i)
@@ -143,14 +155,95 @@ namespace gg
 			}
 			return rank_list;
 		}
+
+		template<typename T, int N>
+		void rankList_1<T, N>::run(handler h)
+		{
+			for(int i = N - 1; i >= 0; --i)
+			{
+				rankItemsWithCount& rk = _rankInfo[i];
+				ForEach(typename rankItems, iter, rk._items)
+					h(*iter);
+			}
+		}
+
+		template<typename T, int N>
+		void rankList_1<T, N>::print()
+		{
+			for(int i = N - 1; i >= 0; --i)
+			{
+				rankItemsWithCount& rk = _rankInfo[i];
+				std::cout << "Interval(" << i << ") Count(" << rk._count << "): ";
+				ForEach(typename rankItems, iter, rk._items)
+				{
+					std::cout << iter->getId() << ", ";
+				}
+				std::cout << "End." << std::endl;
+			}
+		}
+
+
+		Json::Value data_package::_null = Json::nullValue;
+
+		bool data_package::loadDB(int key_id)
+		{
+			db_manager db;
+			if(!db.connect_db(game_svr->getGGData()._mongoDB.c_str()))
+				return false;
+			
+			mongo::BSONObj key = BSON("i" << key_id);
+			mongo::BSONObj obj = db_mgr.FindOne(bgActivity_history_data_db_str, key);
+			if(obj.isEmpty())
+				return false;
+			
+			checkNotEoo(obj["a"])
+			{
+				string str = obj["a"].String();
+				_value = commom_sys.string2json(str);
+			}
+			
+			checkNotEoo(obj["p"])
+			{
+				std::vector<mongo::BSONElement> ele = obj["p"].Array();
+				for(unsigned i = 0; i < ele.size(); ++i)
+				{
+					int player_id = ele[i]["k"].Int();
+					string str = ele[i]["v"].String();
+					Json::Value temp = commom_sys.string2json(str);
+					_pid_infos.insert(make_pair(player_id, temp));
+				}
+			}
+
+			return true;
+		}
+
+		bool data_package::saveDB(int key_id)
+		{
+			mongo::BSONObj key = BSON("i" << key_id);
+			mongo::BSONObjBuilder obj;
+			obj << "i" << key_id << "a" << _value.toStyledString();
+			mongo::BSONArrayBuilder b;
+			ForEach(pid_info, iter, _pid_infos)
+				b.append(iter->second.toStyledString());
+			obj << "p" << b.arr();
+			
+			return db_mgr.save_mongo(bgActivity_history_data_db_str, key, obj.obj());
+		}
+
+		void data_package::insert(int player_id, Json::Value info)
+		{
+			if(player_id == -1)
+				_value = info;
+			else
+				_pid_infos.insert(make_pair(player_id, info));
+		}
 		
 		int defeat_npc::_current_npc_id = -1;
 
 		defeat_npc::defeat_npc(const Json::Value& info)
-			: _npc_id(999999), _max_size(10), _client_size(10), _end_time(0), _rewarded(false)
+			: _npc_id(999999), _max_size(10), _client_size(10), _end_time(0), _reward_type(0)
 		{
 			setType(_defeat_npc);
-			setState(_stopped);
 			setId(info["k"].asUInt());
 
 			if(info["i"] != Json::nullValue)
@@ -165,40 +258,17 @@ namespace gg
 			if(info["e"] != Json::nullValue)
 				_end_time = info["e"].asUInt();
 
-			if(info["b"] != Json::nullValue)
-				_rewarded = info["b"].asBool();
-		}
-		
-		void defeat_npc::loadDB_1()
-		{
-			db_manager db;
-			if(!db.connect_db(game_svr->getGGData()._mongoDB.c_str()))
-				return;
-			
-			mongo::BSONObj key = BSON("i" << getId());
-			mongo::BSONObj obj = db_mgr.FindOne(bgActivity_history_data_db_str, key);
-			if(obj.isEmpty())
-				return;
-			
-			checkNotEoo(obj["l"])
-			{
-				string str = obj["l"].String();
-				_records = commom_sys.string2json(str);
-			}
-			
-			checkNotEoo(obj["p"])
-			{
-				std::vector<mongo::BSONElement> ele = obj["p"].Array();
-				for(unsigned i = 0; i < ele.size(); ++i)
-				{
-					int player_id = ele[i]["i"].Int();
-					int rank = ele[i]["r"].Int();
-					_playerId_ranks.insert(make_pair(player_id, rank));
-				}
-			}
+			if(info["r"] != Json::nullValue)
+				_reward_info = info["r"];
+
+			if(info["c"] != Json::nullValue)
+				_reward_type = info["c"].asInt();
+
+			Timer::AddEventTickTime(boostBind(defeat_npc::stop, this), _end_time);
+			setState(_loading);
 		}
 
-		void defeat_npc::loadDB_2()
+		void defeat_npc::loadDB()
 		{
 			db_manager db;
 			if(!db.connect_db(game_svr->getGGData()._mongoDB.c_str()))
@@ -266,57 +336,67 @@ namespace gg
 
 				_playerId_ranks.insert(make_pair(it->first, _records.size()));
 			}
-			
 		}
 
-		void defeat_npc::start()
+		void defeat_npc::load()
 		{
-			if(_rewarded)
-			{
-				loadDB_1();
-				setState(_stopped);
-			}
-			else
-			{
-				loadDB_2();
-				Timer::AddEventTickTime(boostBind(defeat_npc::stop, this), _end_time);
-				bgActivity_sys.setFunc(boostBind(defeat_npc::run, this));
-				string str;
-				na::msg::msg_json m(gate_client::bgActivity_function_call_inner_req, str);
-				player_mgr.postMessage(m);
-			}
+			_rewarded = _package.loadDB(getId());
+
+			if(!_rewarded)
+				loadDB();
+
+			_Logic_Post(boostBind(defeat_npc::end_load, this));
 		}
 
-		void defeat_npc::run()
+		void defeat_npc::end_load()
 		{
-			if(getState() == _stopped)
+			try
 			{
-				_cache_list.clear();
-				return;
-			}
-
-			ForEach(cache_list, iter, _cache_list)
-			{
-				playerId_ranks::iterator it = _playerId_ranks.find(iter->_player_id);
-				if(it == _playerId_ranks.end())
+				ForEach(cache_list, iter, _cache_list)
 				{
-					Json::Value rcd;
-					rcd.append(iter->_player_id);
-					rcd.append(iter->_name);
-					_records.append(rcd);
-					_playerId_ranks.insert(make_pair(iter->_player_id, _records.size()));
+					playerId_ranks::iterator it = _playerId_ranks.find(iter->_player_id);
+					if(it == _playerId_ranks.end())
+					{
+						Json::Value rcd;
+						rcd.append(iter->_player_id);
+						rcd.append(iter->_name);
+						_records.append(rcd);
+						_playerId_ranks.insert(make_pair(iter->_player_id, _records.size()));
+					}
 				}
-			}
+				_cache_list.clear();
+			
+				setState(_running);
 
-			_cache_list.clear();
-			setState(_running);
+				if(na::time_helper::get_current_time() >= _end_time)
+					stop();
+			}
+			catch(string& error)
+			{
+				LogE << "Error: " << __FUNCTION__ << " (" << error << ")" << LogEnd;
+			}
 		}
 
 		void defeat_npc::stop()
 		{
+			if(getState() != _running)
+				return;
+
+			if(!_rewarded)
+			{
+				_package.insert(-1, _records);
+				ForEach(playerId_ranks, iter, _playerId_ranks)
+				{
+					Json::Value temp = Json::arrayValue;
+					temp.append(iter->second);
+					_package.insert(iter->first, temp);
+				}
+				_package.saveDB(getId());
+
+
+				//todo reward
+			}
 			setState(_stopped);
-			// todo: reward
-			_rewarded = true;
 		}
 
 		void defeat_npc::update(playerDataPtr d)
@@ -329,10 +409,16 @@ namespace gg
 
 			if(getState() == _loading)
 			{
-				cacheItem item = { d->playerID, d->Base.getName() };
-				_cache_list.push_back(item);
+				if(na::time_helper::get_current_time() < _end_time)
+				{
+					cacheItem item = { d->playerID, d->Base.getName() };
+					_cache_list.push_back(item);
+				}
 				return;
 			}
+
+			if(_playerId_ranks.size() >= _max_size)
+				return;
 
 			playerId_ranks::iterator iter = _playerId_ranks.find(d->playerID);
 			if(iter == _playerId_ranks.end())
@@ -347,11 +433,24 @@ namespace gg
 
 		Json::Value defeat_npc::getInfo(playerDataPtr d)
 		{
+			if(getState() == _loading)
+				return Json::nullValue;
+
 			Json::Value info;
 			info["k"] = getId();
-			info["l"] = _records;
-			info["p"] = Json::arrayValue;
-			info["p"].append(getRank(d->playerID));
+			if(_rewarded)
+			{
+				info["l"] = _package.getInfo();
+				info["p"] = _package.getPInfo(d->playerID);
+				if(info["p"] == Json::nullValue)
+					info["p"] = Json::arrayValue;
+			}
+			else
+			{
+				info["l"] = _records;
+				info["p"] = Json::arrayValue;
+				info["p"].append(getRank(d->playerID));
+			}
 			return info;
 		}
 
@@ -367,14 +466,10 @@ namespace gg
 		{
 			setType(_ruler_title);
 			setId(info["k"].asUInt());
+			setState(_loading);
 		}
 
-		void ruler_title::start()
-		{
-			
-		}
-
-		void ruler_title::stop()
+		void ruler_title::load()
 		{
 			
 		}
@@ -386,38 +481,102 @@ namespace gg
 
 		Json::Value ruler_title::getInfo(playerDataPtr d)
 		{
-		
+			return Json::nullValue;
 		}
 		
 		arena_rank::arena_rank(const Json::Value& info)
+			: _end_time(0), _max_size(20), _client_size(20)
 		{
 			setType(_arena_rank);
 			setId(info["k"].asUInt());
+
+			if(info["m"] != Json::nullValue)
+				_max_size = info["m"].asUInt();
+			if(info["s"] != Json::nullValue)
+				_client_size = info["s"].asUInt();
+			if(info["e"] != Json::nullValue)
+				_end_time = info["e"].asUInt();
+
+			if(info["r"] != Json::nullValue)
+				_reward_info = info["r"];
+
+			if(info["c"] != Json::nullValue)
+				_reward_type = info["c"].asInt();
+
+			Timer::AddEventTickTime(boostBind(arena_rank::stop, this), _end_time);
+			setState(_loading);
 		}
 
-		void arena_rank::start()
+		void arena_rank::load()
 		{
-			
+			_rewarded = _package.loadDB(getId());
+
+			_Logic_Post(boostBind(arena_rank::end_load, this));
+		}
+
+		void arena_rank::end_load()
+		{
+			setState(_running);
+			if(na::time_helper::get_current_time() >= _end_time)
+				stop();
 		}
 
 		void arena_rank::stop()
 		{
-			
+			if(getState() != _running)
+				return;
+
+			if(!_rewarded)
+			{
+				
+			}	
+			setState(_stopped);
 		}
 
 		void arena_rank::update(playerDataPtr d)
 		{
-		
+			return;
 		}
 
 		Json::Value arena_rank::getInfo(playerDataPtr d)
 		{
-		
+			if(getState() == _loading)
+				return Json::nullValue;
+			
+			Json::Value info;
+			info["k"] = getId();
+			if(_rewarded)
+			{
+				info["l"] = _package.getInfo();
+				info["p"] = _package.getPInfo(d->playerID);
+				if(info["p"] == Json::nullValue)
+					info["p"] = Json::arrayValue;
+			}
+			else
+			{
+				int count = 0;
+				info["l"] = Json::arrayValue;
+				Json::Value& ref = info["l"];
+				const arena_system::HeroInfos& hero_infos = arena_sys.getAllRankList();
+				for(unsigned i = 1; i < hero_infos.size(); ++i)
+				{
+					if(count >= _client_size)
+						break;
+					Json::Value temp;
+					temp.append(hero_infos[i].get_player_id());
+					temp.append(hero_infos[i].get_nickname());
+					ref.append(temp);
+				}
+				info["p"] = Json::arrayValue;
+				info["p"].append(d->Arena.getRank());
+			}
+			return info;
 		}
 		
 		int level_rank::_oLv = -1;
 
 		level_rank::level_rank(const Json::Value& info)
+			: _end_time(0)
 		{
 			setType(_level_rank);
 			setId(info["k"].asUInt());
@@ -429,9 +588,30 @@ namespace gg
 			if(info["s"] != Json::nullValue)
 				client_size = info["s"].asUInt();
 			_rankList.setParam(max_size, client_size);
+
+			if(info["e"] != Json::nullValue)
+				_end_time = info["e"].asUInt();
+
+			if(info["r"] != Json::nullValue)
+				_reward_info = info["r"];
+
+			if(info["c"] != Json::nullValue)
+				_reward_type = info["c"].asInt();
+
+			Timer::AddEventTickTime(boostBind(level_rank::stop, this), _end_time);
+			setState(_loading);
 		}
 
-		void level_rank::start()
+		void level_rank::load()
+		{
+			_rewarded = _package.loadDB(getId());
+			if(!_rewarded)
+				loadDB();
+
+			_Logic_Post(boostBind(level_rank::end_load, this));
+		}
+
+		void level_rank::loadDB()
 		{	
 			db_manager db;
 			if(!db.connect_db(game_svr->getGGData()._mongoDB.c_str()))
@@ -448,24 +628,46 @@ namespace gg
 				levelItem item(player_id, name, lv, exp);
 				_rankList.update(item, lv);
 			}
-
-			bgActivity_sys.setFunc(boostBind(level_rank::run, this));
-			string str;
-			na::msg::msg_json m(gate_client::bgActivity_function_call_inner_req, str);
-			player_mgr.postMessage(m);
 		}
-			
-		void level_rank::run()
+
+		void level_rank::end_load()
 		{
 			ForEach(cache_list, iter, _cache_list)
 				_rankList.update(*iter);
 
 			setState(_running);
+			if(na::time_helper::get_current_time() >= _end_time)
+				stop();
 		}
 
 		void level_rank::stop()
 		{
-			setState(_stopped);		
+			if(getState() != _running)
+				return;
+
+			if(!_rewarded)
+			{
+				_rank_helper = 0;
+				_reward_package.clear();
+				_reward_package.assign(_reward_info.size(), Json::nullValue);
+
+				_rankList.run(boostBind(level_rank::run, this, _1));
+
+				for(unsigned i = 0; i < _reward_package.size(); ++i)
+				{
+					Json::Value msg;
+					msg[msgStr] = Json::arrayValue;
+					msg[msgStr].append(_reward_package[i]);
+					msg[msgStr].append(_reward_info[i][1u]);
+					string str = msg.toStyledString();
+					na::msg::msg_json m(gate_client::bgActivity_reward_inner_req, str);
+					player_mgr.postMessage(m);
+				}
+
+				_rewarded = true;
+				_package.saveDB(getId());
+			}
+			setState(_stopped);
 		}
 
 		void level_rank::update(playerDataPtr d)
@@ -475,8 +677,11 @@ namespace gg
 
 			if(getState() == _loading)
 			{
-				levelItem item(d->playerID, d->Base.getName(), d->Base.getLevel(), d->Base.getExp());
-				_cache_list.push_back(item);
+				if(na::time_helper::get_current_time() < _end_time)
+				{
+					levelItem item(d->playerID, d->Base.getName(), d->Base.getLevel(), d->Base.getExp());
+					_cache_list.push_back(item);
+				}
 				return;
 			}
 
@@ -486,12 +691,54 @@ namespace gg
 
 		Json::Value level_rank::getInfo(playerDataPtr d)
 		{
-		
+			if(getState() == _loading)
+				return Json::nullValue;
+
+			Json::Value info;
+			info["k"] = getId();
+			if(_rewarded)
+			{
+				info["l"] = _package.getInfo();
+				info["p"] = _package.getPInfo(d->playerID);
+				if(info["p"] == Json::nullValue)
+					info["p"] = Json::arrayValue;
+			}
+			else
+			{
+				info["l"] = _rankList.getInfo();
+				info["p"] = Json::arrayValue;
+				info["p"].append(_rankList.getRank(d->playerID, d->Base.getLevel()));
+			}
+			return info;
+		}
+
+		void level_rank::run(const levelItem& item)
+		{
+			++_rank_helper;
+			int rank = _rank_helper;
+			
+			for(unsigned i = 0; i < _reward_info.size(); ++i)
+			{
+				Json::Value& range = _reward_info[i][0u];
+				if(rank >= range[0u].asInt() && rank <= range[1u].asInt())
+				{
+					Json::Value content;
+					content["x"] = _name;
+					content["y"] = rank;
+
+					Json::Value info;
+					info["i"] = item.getId();
+					info["c"] = content;
+					
+					_reward_package[i].append(info);
+				}
+			}
 		}
 
 		int office_rank::_oLv = -1;
 
 		office_rank::office_rank(const Json::Value& info)
+			: _end_time(0)
 		{
 			setType(_office_rank);
 			setId(info["k"].asUInt());
@@ -503,13 +750,22 @@ namespace gg
 			if(info["s"] != Json::nullValue)
 				client_size = info["s"].asUInt();
 			_rankList.setParam(max_size, client_size);
-		}
 
-		void office_rank::start()
-		{
+			if(info["e"] != Json::nullValue)
+				_end_time = info["e"].asUInt();
+
+			if(info["r"] != Json::nullValue)
+				_reward_info = info["r"];
+
+			if(info["c"] != Json::nullValue)
+				_reward_type = info["c"].asInt();
+
+			Timer::AddEventTickTime(boostBind(office_rank::stop, this), _end_time);
 			setState(_loading);
-			sleep(5);
-
+		}
+		
+		void office_rank::loadDB()
+		{
 			db_manager db;
 			if(!db.connect_db(game_svr->getGGData()._mongoDB.c_str()))
 				return;
@@ -541,24 +797,79 @@ namespace gg
 			
 			ForEach(item_map, iter, items)
 				_rankList.update(iter->second, iter->second.getInterval());
-			
-			bgActivity_sys.setFunc(boostBind(office_rank::run, this));
-			string str;
-			na::msg::msg_json m(gate_client::bgActivity_function_call_inner_req, str);
-			player_mgr.postMessage(m);
 		}
-			
-		void office_rank::run()
+		
+		void office_rank::load()
+		{
+			_rewarded = _package.loadDB(getId());
+			if(!_rewarded)
+				loadDB();
+
+			_Logic_Post(boostBind(office_rank::end_load, this));
+		}
+
+		void office_rank::end_load()
 		{
 			ForEach(cache_list, iter, _cache_list)
 				_rankList.update(*iter);
 
 			setState(_running);
+			if(na::time_helper::get_current_time() >= _end_time)
+				stop();
 		}
 
 		void office_rank::stop()
 		{
-			setState(_stopped);		
+			if(getState() != _running)
+				return;
+
+			if(!_rewarded)
+			{
+				_rank_helper = 0;
+				_reward_package.clear();
+				_reward_package.assign(_reward_info.size(), Json::nullValue);
+
+				_rankList.run(boostBind(office_rank::run, this, _1));
+
+				for(unsigned i = 0; i < _reward_package.size(); ++i)
+				{
+					Json::Value msg;
+					msg[msgStr] = Json::arrayValue;
+					msg[msgStr].append(_reward_package[i]);
+					msg[msgStr].append(_reward_info[i][1u]);
+					string str = msg.toStyledString();
+					na::msg::msg_json m(gate_client::bgActivity_reward_inner_req, str);
+					player_mgr.postMessage(m);
+				}
+
+				_rewarded = true;
+				_package.saveDB(getId());
+				
+			}
+			setState(_stopped);
+		}
+
+		void office_rank::run(const officeItem& item)
+		{
+			++_rank_helper;
+			int rank = _rank_helper;
+			
+			for(unsigned i = 0; i < _reward_info.size(); ++i)
+			{
+				Json::Value& range = _reward_info[i][0u];
+				if(rank >= range[0u].asInt() && rank <= range[1u].asInt())
+				{
+					Json::Value content;
+					content["x"] = _name;
+					content["y"] = rank;
+
+					Json::Value info;
+					info["i"] = item.getId();
+					info["c"] = content;
+					
+					_reward_package[i].append(info);
+				}
+			}
 		}
 
 		void office_rank::update(playerDataPtr d)
@@ -568,8 +879,11 @@ namespace gg
 
 			if(getState() == _loading)
 			{
-				officeItem item(d->playerID, d->Base.getName(), d->Office.getOffcialLevel(), d->Base.getWeiWang());
-				_cache_list.push_back(item);
+				if(na::time_helper::get_current_time() < _end_time)
+				{
+					officeItem item(d->playerID, d->Base.getName(), d->Office.getOffcialLevel(), d->Base.getWeiWang());
+					_cache_list.push_back(item);
+				}
 				return;
 			}
 
@@ -579,7 +893,25 @@ namespace gg
 
 		Json::Value office_rank::getInfo(playerDataPtr d)
 		{
-		
+			if(getState() == _loading)
+				return Json::nullValue;
+
+			Json::Value info;
+			info["k"] = getId();
+			if(_rewarded)
+			{
+				info["l"] = _package.getInfo();
+				info["p"] = _package.getPInfo(d->playerID);
+				if(info["p"] == Json::nullValue)
+					info["p"] = Json::arrayValue;
+			}
+			else
+			{
+				info["l"] = _rankList.getInfo();
+				info["p"] = Json::arrayValue;
+				info["p"].append(_rankList.getRank(d->playerID, d->Office.getOffcialLevel()));
+			}
+			return info;
 		}
 
 		guild_rank::guild_rank(const Json::Value& info)
@@ -588,24 +920,39 @@ namespace gg
 			setId(info["k"].asUInt());
 		}
 
-		void guild_rank::start()
+		void guild_rank::load()
 		{
-			
-		}
-
-		void guild_rank::stop()
-		{
-			
+			_rewarded == _package.loadDB(getId());		
 		}
 
 		void guild_rank::update(playerDataPtr d)
 		{
-		
+			return;
 		}
 
 		Json::Value guild_rank::getInfo(playerDataPtr d)
 		{
-		
+			Json::Value info;
+			info["g"] = guild_sys.packageGuild(_client_size, d->Base.getSphereID());
+			info["p"] = Json::arrayValue;
+			int gid = d->Guild.getGuildID();
+			Guild::guildPtr gptr = guild_sys.getGuild(gid);
+			if(gptr != Guild::guildPtr())
+			{
+				int rk = 0;
+				for(; rk < info["g"].size(); ++rk)
+				{
+					if(info["g"][rk][0u].asInt() == gid)
+						break;
+				}
+				if(rk != info["g"].size())
+				{
+					info["p"].append(gptr->guildName);
+					info["p"].append(rk + 1);
+				}
+			}
+
+			return info;
 		}
 	}
 }
